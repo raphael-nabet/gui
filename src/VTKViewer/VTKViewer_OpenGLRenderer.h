@@ -61,9 +61,15 @@ private:
 
 #ifdef VTK_OPENGL2
   VTKViewer_OpenGLHelper OpenGLHelper;
+#ifdef __APPLE__
+  VTKViewer_GLhandle            BackgroundProgram;
+  VTKViewer_GLhandle            BackgroundVertexShader;
+  VTKViewer_GLhandle            BackgroundFragmentShader;
+#else
   GLhandleARB            BackgroundProgram;
   GLhandleARB            BackgroundVertexShader;
   GLhandleARB            BackgroundFragmentShader;
+#endif
   GLuint                 VertexArrayObject;
 
   struct Locations

@@ -149,6 +149,10 @@ end
 
 if ( "${MY_PATH}" != "" ) setenv PATH ${MY_PATH}:${PATH}
 if ( "${MY_LD_LIBRARY_PATH}" != "" ) setenv LD_LIBRARY_PATH ${MY_LD_LIBRARY_PATH}:${LD_LIBRARY_PATH}
+if ( `uname -s` == "Darwin" ) then
+    if (! ($?DYLD_LIBRARY_PATH) ) setenv DYLD_LIBRARY_PATH
+    if ( "${MY_LD_LIBRARY_PATH}" != "" ) setenv DYLD_LIBRARY_PATH ${MY_LD_LIBRARY_PATH}:${DYLD_LIBRARY_PATH}
+endif
 if ( "${PYTHONPATH}" != "" ) setenv PYTHONPATH ${MY_PYTHONPATH}:${PYTHONPATH}
 
 ###

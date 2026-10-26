@@ -399,6 +399,16 @@ LightApp_Application::LightApp_Application()
   QPixmap aLogo = aResMgr->loadPixmap( "LightApp", tr( "APP_DEFAULT_ICO" ), false );
 
   desktop()->setWindowIcon( aLogo );
+#ifdef __APPLE__
+  // On macOS the Dock icon is the application icon, not the window icon.
+  // SALOME_APP_ICON (set by the launcher of the SALOME.app bundle) gives the
+  // icon of the bundle; default: the SALOME logo.
+  QString aDockIcon = QString::fromLocal8Bit( qgetenv( "SALOME_APP_ICON" ) );
+  if ( !aDockIcon.isEmpty() && QFile::exists( aDockIcon ) )
+    QApplication::setWindowIcon( QIcon( aDockIcon ) );
+  else
+    QApplication::setWindowIcon( QIcon( aLogo ) );
+#endif
   desktop()->setDockableMenuBar( false );
   desktop()->setDockableStatusBar( false );
 
@@ -1629,6 +1639,10 @@ protected:
       // remove LD_LIBRARY_PATH from the environement before starting launcher to avoid bad interactions.
       // (especially in the case of universal binaries)
       env.remove("LD_LIBRARY_PATH");
+#ifdef __APPLE__
+      env.remove("DYLD_LIBRARY_PATH");
+      env.remove("DYLD_FALLBACK_LIBRARY_PATH");
+#endif
 #endif
       QProcess* proc = new QProcess();
       proc->setProcessEnvironment(env);
@@ -1664,6 +1678,8 @@ void LightApp_Application::showHelp( const QString& path )
   {
 #ifdef WIN32
     QString browser = resMgr->stringValue( "ExternalBrowser", "winapplication" ) ;
+#elif defined(__APPLE__)
+    QString browser = resMgr->stringValue( "ExternalBrowser", "macapplication" );
 #else
     QString browser = resMgr->stringValue( "ExternalBrowser", "application" );
 #endif
@@ -2861,12 +2877,15 @@ void LightApp_Application::createPreferences( LightApp_Preferences* pref )
   // ... "Help browser" group <<start>>
 #ifndef DISABLE_QTXWEBBROWSER
   int extgroup = pref->addPreference( tr( "PREF_GROUP_EXT_BROWSER" ), genTab, LightApp_Preferences::Auto, "ExternalBrowser", "use_external_browser");
+
 #else
   int extgroup = pref->addPreference( tr( "PREF_GROUP_EXT_BROWSER" ), genTab );
 #endif
 
 #ifdef WIN32
   QString platform = "winapplication";
+#elif defined(__APPLE__)
+  QString platform = "macapplication";
 #else
   QString platform = "application";
 #endif
@@ -4674,7 +4693,7 @@ bool LightApp_Application::checkModule( const QString& title )
 #if defined(WIN32)
   paths = QString( Qtx::getenv( "PATH" ) ).split( ";", QString::SkipEmptyParts );
 #elif defined(__APPLE__)
-  paths = QString( Qtx::getenv( "DYLD_LIBRARY_PATH" ) ).split( ":", QString::SkipEmptyParts );
+  paths += QString( Qtx::getenv( "DYLD_LIBRARY_PATH" ) ).split( ":", QString::SkipEmptyParts );
 #else
   paths = QString( Qtx::getenv( "LD_LIBRARY_PATH" ) ).split( ":", QString::SkipEmptyParts );
 #endif

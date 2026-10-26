@@ -134,10 +134,21 @@ private:
   vtkSmartPointer<vtkImageData> ImageData;
 
   VTKViewer_OpenGLHelper OpenGLHelper;
+
+#ifndef __APPLE__
+  VTKViewer_GLhandle PointProgram;
+#else
   GLhandleARB PointProgram;
+#endif
+
 #ifdef VTK_OPENGL2
+#ifndef __APPLE__
+  VTKViewer_GLhandle VertexShader;
+  VTKViewer_GLhandle FragmentShader;
+#else
   GLhandleARB VertexShader;
   GLhandleARB FragmentShader;
+#endif
   GLuint      VertexArrayObject;
 #endif
 

@@ -50,25 +50,7 @@
 # ifndef GLX_GLXEXT_LEGACY
 #  define GLX_GLXEXT_LEGACY
 # endif
-#ifdef __APPLE__
-#import <mach-o/dyld.h>
-#import <stdlib.h>
-#import <string.h>
-void * glXGetProcAddressARB (const GLubyte *name)
-
-{
-    NSSymbol symbol;
-    char *symbolName;
-    symbolName = (char *)malloc (strlen ((const char *)name) + 2); // 1
-    strcpy(symbolName + 1, (const char *)name); // 2
-    symbolName[0] = '_'; // 3
-    symbol = NULL;
-    if (NSIsSymbolNameDefined (symbolName)) // 4
-        symbol = NSLookupAndBindSymbol (symbolName);
-    free (symbolName); // 5
-    return symbol ? NSAddressOfSymbol (symbol) : NULL; // 6
-}
-#else
+#ifndef __APPLE__
 # include <GL/glx.h>
 #endif
 # include <dlfcn.h>
@@ -179,8 +161,11 @@ int VTKViewer_PolyDataMapper::InitShader()
   this->myLocations.Projection          = this->OpenGLHelper.vglGetUniformLocationARB( this->PointProgram, "uProjectionMatrix" );
   this->myLocations.GeneralPointSize    = this->OpenGLHelper.vglGetUniformLocationARB( this->PointProgram, "uGeneralPointSize" );
   this->myLocations.PointSprite         = this->OpenGLHelper.vglGetUniformLocationARB( this->PointProgram, "uPointSprite" );
-
+#ifndef __APPLE__
+  this->OpenGLHelper.vglUseProgramObjectARB(current_program);
+#else
   this->OpenGLHelper.vglUseProgramObjectARB( current_program );
+#endif
 
   this->OpenGLHelper.vglGenVertexArraysARB(1, &this->VertexArrayObject);
 #else
@@ -194,7 +179,11 @@ int VTKViewer_PolyDataMapper::InitShader()
 
   char* shader = GUI_OPENGL::readFromFile( fileName );
 
+#ifndef __APPLE__
+  VTKViewer_GLhandle VertexShader = this->OpenGLHelper.vglCreateShaderObjectARB( GL_VERTEX_SHADER_ARB );
+#else
   GLhandleARB VertexShader = this->OpenGLHelper.vglCreateShaderObjectARB( GL_VERTEX_SHADER_ARB );
+#endif
   this->OpenGLHelper.vglShaderSourceARB( VertexShader, 1, (const GLcharARB**)&shader, NULL );
   this->OpenGLHelper.vglCompileShaderARB( VertexShader );
 

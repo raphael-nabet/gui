@@ -35,25 +35,8 @@
 # ifndef GLX_GLXEXT_LEGACY
 #  define GLX_GLXEXT_LEGACY
 # endif
-#ifdef __APPLE__
-#import <mach-o/dyld.h>
-#import <stdlib.h>
-#import <string.h>
-void * glXGetProcAddressARB (const GLubyte *name)
 
-{
-    NSSymbol symbol;
-    char *symbolName;
-    symbolName = (char *)malloc (strlen ((const char *)name) + 2); // 1
-    strcpy(symbolName + 1, (const char *)name); // 2
-    symbolName[0] = '_'; // 3
-    symbol = NULL;
-    if (NSIsSymbolNameDefined (symbolName)) // 4
-        symbol = NSLookupAndBindSymbol (symbolName);
-    free (symbolName); // 5
-    return symbol ? NSAddressOfSymbol (symbol) : NULL; // 6
-}
-#else
+#ifndef __APPLE__
 # include <GL/glx.h>
 #endif
 # include <dlfcn.h>
@@ -110,10 +93,12 @@ static PFNGLRENDERBUFFERSTORAGEEXTPROC vglRenderbufferStorageEXT = NULL;
 static PFNGLFRAMEBUFFERRENDERBUFFEREXTPROC vglFramebufferRenderbufferEXT = NULL;
 static PFNGLDELETERENDERBUFFERSEXTPROC vglDeleteRenderbuffersEXT = NULL;
 
-#ifndef WIN32
-#define GL_GetProcAddress( x ) glXGetProcAddressARB( (const GLubyte*)x )
-#else
+#if defined(WIN32)
 #define GL_GetProcAddress( x ) wglGetProcAddress( (const LPCSTR)x )
+#elif defined(__APPLE__)
+#define GL_GetProcAddress( x ) dlsym( RTLD_DEFAULT, x )
+#else
+#define GL_GetProcAddress( x ) glXGetProcAddressARB( (const GLubyte*)x )
 #endif
 
 bool InitializeEXT()
@@ -153,7 +138,7 @@ OpenGLUtils_FrameBuffer::~OpenGLUtils_FrameBuffer()
 
 bool OpenGLUtils_FrameBuffer::init( const GLsizei& xSize, const GLsizei& ySize )
 {
-#if defined(VTK_OPENGL2) && ! defined(WIN32)
+#if defined(VTK_OPENGL2) && ! defined(WIN32) && !defined(__APPLE__)
   int n = 0;
   std::ostringstream strm;
   glGetIntegerv(GL_NUM_EXTENSIONS, &n);

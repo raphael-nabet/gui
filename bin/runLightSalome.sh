@@ -240,6 +240,11 @@ run_light_salome()
     LD_LIBRARY_PATH=${my_ld_library_path}:${LD_LIBRARY_PATH}
     LD_LIBRARY_PATH=$(echo ${LD_LIBRARY_PATH} | sed -e "s,^:,,;s,:$,,;s,::\+,:,g")
     export LD_LIBRARY_PATH
+    if [ "$(uname -s)" = "Darwin" ]; then
+        DYLD_LIBRARY_PATH=${my_ld_library_path}:${DYLD_LIBRARY_PATH}
+        DYLD_LIBRARY_PATH=$(echo ${DYLD_LIBRARY_PATH} | sed -e "s,^:,,;s,:$,,;s,::\+,:,g")
+        export DYLD_LIBRARY_PATH
+    fi
     PYTHONPATH=${my_pythonpath}:${PYTHONPATH}
     PYTHONPATH=$(echo ${PYTHONPATH} | sed -e "s,^:,,;s,:$,,;s,::\+,:,g")
     export PYTHONPATH

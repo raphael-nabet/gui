@@ -24,21 +24,32 @@
 #include "VTKViewer_OpenGLHelper.h"
 #include <Basics_Utils.hxx>
 
-#ifndef WIN32
-# ifndef GLX_GLXEXT_LEGACY
-#  define GLX_GLXEXT_LEGACY
-# endif
-# include <GL/glx.h>
+#if defined(WIN32)
+# include <wingdi.h>
+#elif defined(__APPLE__)
 # include <dlfcn.h>
 #else
-# include <wingdi.h>
+ # ifndef GLX_GLXEXT_LEGACY
+ #  define GLX_GLXEXT_LEGACY
+ # endif
+ # include <GL/glx.h>
+ # include <dlfcn.h>
+ #endif
+
+#if defined(WIN32)
+#define GL_GetProcAddress( x )   wglGetProcAddress( (const LPCSTR)x )
+#elif defined(__APPLE__)
+#define GL_GetProcAddress( x )   dlsym( RTLD_DEFAULT, x )
+#else
+ #define GL_GetProcAddress( x )   glXGetProcAddressARB( (const GLubyte*)x )
 #endif
 
-#ifndef WIN32
-#define GL_GetProcAddress( x )   glXGetProcAddressARB( (const GLubyte*)x )
-#else
-#define GL_GetProcAddress( x )   wglGetProcAddress( (const LPCSTR)x )
-#endif 
+#ifdef __APPLE__
+#define GL_ARB_OR_CORE( arb, core )   core
+ #else
+#define GL_ARB_OR_CORE( arb, core )   arb
+#endif
+
 
 // ============================================================================
 // function : VTKViewer_OpenGLHelper
@@ -98,31 +109,59 @@ void VTKViewer_OpenGLHelper::Init()
   if (mIsInitialized)
     return;
 
+#ifdef __APPLE__
+  vglShaderSourceARB = (PFNGLSHADERSOURCEARBPROC)GL_GetProcAddress( GL_ARB_OR_CORE( "glShaderSourceARB", "glShaderSource" ) );
+#else
   vglShaderSourceARB = (PFNGLSHADERSOURCEARBPROC)GL_GetProcAddress( "glShaderSourceARB" );
+#endif
   if( !vglShaderSourceARB )
     return;
 
+#ifdef __APPLE__
+  vglCreateShaderObjectARB = (PFNGLCREATESHADEROBJECTARBPROC)GL_GetProcAddress( GL_ARB_OR_CORE( "glCreateShaderObjectARB", "glCreateShader" ) );
+#else
   vglCreateShaderObjectARB = (PFNGLCREATESHADEROBJECTARBPROC)GL_GetProcAddress( "glCreateShaderObjectARB" );
+#endif
   if( !vglCreateShaderObjectARB )
     return;
 
+#ifdef __APPLE__
+  vglCompileShaderARB = (PFNGLCOMPILESHADERARBPROC)GL_GetProcAddress( GL_ARB_OR_CORE( "glCompileShaderARB", "glCompileShader" ) );
+#else
   vglCompileShaderARB = (PFNGLCOMPILESHADERARBPROC)GL_GetProcAddress( "glCompileShaderARB" );
+#endif
   if( !vglCompileShaderARB )
     return;
 
+#ifdef __APPLE__
+  vglCreateProgramObjectARB = (PFNGLCREATEPROGRAMOBJECTARBPROC)GL_GetProcAddress( GL_ARB_OR_CORE( "glCreateProgramObjectARB", "glCreateProgram" ) );
+#else
   vglCreateProgramObjectARB = (PFNGLCREATEPROGRAMOBJECTARBPROC)GL_GetProcAddress( "glCreateProgramObjectARB" );
+#endif
   if( !vglCreateProgramObjectARB )
     return;
 
+#ifdef __APPLE__
+  vglAttachObjectARB = (PFNGLATTACHOBJECTARBPROC)GL_GetProcAddress( GL_ARB_OR_CORE( "glAttachObjectARB", "glAttachShader" ) );
+#else
   vglAttachObjectARB = (PFNGLATTACHOBJECTARBPROC)GL_GetProcAddress( "glAttachObjectARB" );
+#endif
   if( !vglAttachObjectARB )
     return;
 
+#ifdef __APPLE__
+  vglLinkProgramARB = (PFNGLLINKPROGRAMARBPROC)GL_GetProcAddress( GL_ARB_OR_CORE( "glLinkProgramARB", "glLinkProgram" ) );
+#else
   vglLinkProgramARB = (PFNGLLINKPROGRAMARBPROC)GL_GetProcAddress( "glLinkProgramARB" );
+#endif
   if( !vglLinkProgramARB )
     return;
 
+#ifdef __APPLE__
+  vglUseProgramObjectARB = (PFNGLUSEPROGRAMOBJECTARBPROC)GL_GetProcAddress( GL_ARB_OR_CORE( "glUseProgramObjectARB", "glUseProgram" ) );
+#else
   vglUseProgramObjectARB = (PFNGLUSEPROGRAMOBJECTARBPROC)GL_GetProcAddress( "glUseProgramObjectARB" );
+#endif
   if( !vglUseProgramObjectARB )
     return;
 
@@ -159,33 +198,49 @@ void VTKViewer_OpenGLHelper::Init()
     return;
 
 #ifdef VTK_OPENGL2
+#ifdef __APPLE__
+  vglDetachObjectARB = (PFNGLDETACHOBJECTARBPROC)GL_GetProcAddress( GL_ARB_OR_CORE( "glDetachObjectARB", "glDetachShader" ) );
+#else
   vglDetachObjectARB = (PFNGLDETACHOBJECTARBPROC)GL_GetProcAddress( "glDetachObjectARB" );
+#endif
   if( !vglDetachObjectARB )
     return;
 
+#ifdef __APPLE__
+  vglDeleteObjectARB = (PFNGLDELETEOBJECTARBPROC)GL_GetProcAddress( GL_ARB_OR_CORE( "glDeleteObjectARB", "glDeleteShader" ) );
+#else
   vglDeleteObjectARB = (PFNGLDELETEOBJECTARBPROC)GL_GetProcAddress( "glDeleteObjectARB" );
+#endif
   if( !vglDeleteObjectARB )
     return;
 
+#ifdef __APPLE__
+  vglValidateProgramARB = (PFNGLVALIDATEPROGRAMARBPROC)GL_GetProcAddress( GL_ARB_OR_CORE( "glValidateProgramARB", "glValidateProgram" ) );
+#else
   vglValidateProgramARB = (PFNGLVALIDATEPROGRAMARBPROC)GL_GetProcAddress( "glValidateProgramARB" );
+#endif
   if ( !vglValidateProgramARB )
     return;
 
+#ifdef __APPLE__
+  vglGetUniformLocationARB = (PFNGLGETUNIFORMLOCATIONARBPROC)GL_GetProcAddress( GL_ARB_OR_CORE( "glGetUniformLocationARB", "glGetUniformLocation" ) );
+#else
   vglGetUniformLocationARB = (PFNGLGETUNIFORMLOCATIONARBPROC)GL_GetProcAddress( "glGetUniformLocationARB" );
+#endif
   if( !vglGetUniformLocationARB )
     return;
-                       
+
   vglGetShaderivARB = (PFNGLGETSHADERIVARBPROC)GL_GetProcAddress( "glGetShaderiv" );
   if( !vglGetShaderivARB )
     return;
 
   vglActiveTextureARB = (PFNGLACTIVETEXTUREARBPROC)GL_GetProcAddress( "glActiveTexture" );
   if (!vglActiveTextureARB)
-	  return;
+    return;
 
   vglGetStringiARB = (PFNGLGETSTRINGIPROC)GL_GetProcAddress("glGetStringi");
   if (!vglGetStringiARB)
-	  return;
+    return;
 
   vglGetProgramivARB = (PFNGLGETPROGRAMIVARBPROC)GL_GetProcAddress( "glGetProgramiv" );
   if( !vglGetProgramivARB )
@@ -252,9 +307,19 @@ namespace GUI_OPENGL
 // purpose  :
 // ============================================================================
 bool VTKViewer_OpenGLHelper::CreateShaderProgram (const std::string& theFilePath,
+#ifdef __APPLE__
+                                            VTKViewer_GLhandle&       theProgram,
+                                            VTKViewer_GLhandle&       theVertexShader,
+                                            VTKViewer_GLhandle&       theFragmentShader
+#else
                                                   GLhandleARB&       theProgram,
                                                   GLhandleARB&       theVertexShader,
-                                                  GLhandleARB&       theFragmentShader) const
+                                                  GLhandleARB&       theFragmentShader
+#endif
+                                                  ) const
+
+
+
 {
 #ifdef VTK_OPENGL2
   // Create program.
@@ -347,9 +412,17 @@ bool VTKViewer_OpenGLHelper::CreateShaderProgram (const std::string& theFilePath
 // function : DestroyShaderProgram
 // purpose  :
 // ============================================================================
-void VTKViewer_OpenGLHelper::DestroyShaderProgram (GLhandleARB theProgram,
-                                                   GLhandleARB theVertexShader,
-                                                   GLhandleARB theFragmentShader) const
+void VTKViewer_OpenGLHelper::DestroyShaderProgram (
+#ifdef __APPLE__
+                                                    VTKViewer_GLhandle theProgram,
+                                                    VTKViewer_GLhandle theVertexShader,
+                                                    VTKViewer_GLhandle theFragmentShader
+#else
+                                                    GLhandleARB&       theProgram,
+                                                    GLhandleARB&       theVertexShader,
+                                                    GLhandleARB&       theFragmentShader
+#endif
+                                                  ) const
 {
 #ifdef VTK_OPENGL2
   vglDetachObjectARB (theProgram, theVertexShader);

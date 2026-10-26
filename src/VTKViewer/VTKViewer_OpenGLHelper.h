@@ -28,11 +28,19 @@
 #include <windows.h>
 #endif
 
+#ifdef __APPLE__
+#include <OpenGL/gl.h>
+#else
 #include <GL/gl.h>
+#endif
 
-
+#ifdef __APPLE__
+typedef GLuint VTKViewer_GLhandle;
+#else
 #ifndef GL_ARB_shader_objects
 typedef GLuint GLhandleARB;
+#endif
+typedef GLhandleARB VTKViewer_GLhandle;
 #endif
 
 #ifndef APIENTRY
@@ -114,41 +122,78 @@ public:
 
 public:
   bool CreateShaderProgram (const std::string& theFilePath,
-                            GLhandleARB&       theProgram,
-                            GLhandleARB&       theVertexShader,
-                            GLhandleARB&       theFragmentShader) const;
+#ifdef __APPLE__
+                                            VTKViewer_GLhandle&       theProgram,
+                                            VTKViewer_GLhandle&       theVertexShader,
+                                            VTKViewer_GLhandle&       theFragmentShader
+#else
+                                                  GLhandleARB&       theProgram,
+                                                  GLhandleARB&       theVertexShader,
+                                                  GLhandleARB&       theFragmentShader
+#endif
+                                                  ) const;
 
-  void DestroyShaderProgram (GLhandleARB theProgram,
-                             GLhandleARB theVertexShader,
-                             GLhandleARB theFragmentShader) const;
+  void DestroyShaderProgram (
+#ifdef __APPLE__
+                                                    VTKViewer_GLhandle theProgram,
+                                                    VTKViewer_GLhandle theVertexShader,
+                                                    VTKViewer_GLhandle theFragmentShader
+#else
+                                                    GLhandleARB&       theProgram,
+                                                    GLhandleARB&       theVertexShader,
+                                                    GLhandleARB&       theFragmentShader
+#endif
+                                                  ) const;
+
 #ifdef VTK_OPENGL2
   void SetUniformMatrix (const GLint         theLocation,
                          const vtkMatrix4x4* theMatrix) const;
 #endif  
 
 protected:
+#ifdef __APPLE__
+  typedef void        (APIENTRYP PFNGLSHADERSOURCEARBPROC)             (VTKViewer_GLhandle shaderObj, GLsizei count, const GLcharARB* *string, const GLint *length);
+  typedef VTKViewer_GLhandle (APIENTRYP PFNGLCREATESHADEROBJECTARBPROC)       (GLenum shaderType);
+#else
   typedef void        (APIENTRYP PFNGLSHADERSOURCEARBPROC)             (GLhandleARB shaderObj, GLsizei count, const GLcharARB* *string, const GLint *length);
   typedef GLhandleARB (APIENTRYP PFNGLCREATESHADEROBJECTARBPROC)       (GLenum shaderType);
+#endif
   typedef void        (APIENTRYP PFNGLBINDBUFFERARBPROC)               (GLenum target, GLuint buffer);
   typedef void        (APIENTRYP PFNGLDELETEBUFFERSARBPROC)            (GLsizei n, const GLuint *buffers);
   typedef void        (APIENTRYP PFNGLGENBUFFERSARBPROC)               (GLsizei n, GLuint *buffers);
   typedef void        (APIENTRYP PFNGLBUFFERDATAARBPROC)               (GLenum target, GLsizeiptrARB size, const GLvoid *data, GLenum usage);
+#ifdef __APPLE__
+  typedef void        (APIENTRYP PFNGLCOMPILESHADERARBPROC)            (VTKViewer_GLhandle shaderObj);
+  typedef VTKViewer_GLhandle (APIENTRYP PFNGLCREATEPROGRAMOBJECTARBPROC)      (void);
+  typedef void        (APIENTRYP PFNGLATTACHOBJECTARBPROC)             (VTKViewer_GLhandle containerObj, VTKViewer_GLhandle obj);
+  typedef void        (APIENTRYP PFNGLLINKPROGRAMARBPROC)              (VTKViewer_GLhandle programObj);
+  typedef void        (APIENTRYP PFNGLUSEPROGRAMOBJECTARBPROC)         (VTKViewer_GLhandle programObj);
+  typedef GLint       (APIENTRYP PFNGLGETATTRIBLOCATIONARBPROC)        (VTKViewer_GLhandle programObj, const GLcharARB *name);
+#else
   typedef void        (APIENTRYP PFNGLCOMPILESHADERARBPROC)            (GLhandleARB shaderObj);
   typedef GLhandleARB (APIENTRYP PFNGLCREATEPROGRAMOBJECTARBPROC)      (void);
   typedef void        (APIENTRYP PFNGLATTACHOBJECTARBPROC)             (GLhandleARB containerObj, GLhandleARB obj);
   typedef void        (APIENTRYP PFNGLLINKPROGRAMARBPROC)              (GLhandleARB programObj);
   typedef void        (APIENTRYP PFNGLUSEPROGRAMOBJECTARBPROC)         (GLhandleARB programObj);
   typedef GLint       (APIENTRYP PFNGLGETATTRIBLOCATIONARBPROC)        (GLhandleARB programObj, const GLcharARB *name);
+#endif
   typedef void        (APIENTRYP PFNGLVERTEXATTRIBPOINTERARBPROC)      (GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid *pointer);
   typedef void        (APIENTRYP PFNGLENABLEVERTEXATTRIBARRAYARBPROC)  (GLuint index);
   typedef void        (APIENTRYP PFNGLDISABLEVERTEXATTRIBARRAYARBPROC) (GLuint index);
 
 #ifdef VTK_OPENGL2
   typedef void        (APIENTRYP PFNGLACTIVETEXTUREARBPROC)            (GLenum texture);
+#ifdef __APPLE__
+  typedef void        (APIENTRYP PFNGLDETACHOBJECTARBPROC)             (VTKViewer_GLhandle containerObj, VTKViewer_GLhandle obj);
+  typedef void        (APIENTRYP PFNGLDELETEOBJECTARBPROC)             (VTKViewer_GLhandle obj);
+  typedef void        (APIENTRYP PFNGLVALIDATEPROGRAMARBPROC)          (VTKViewer_GLhandle program);
+  typedef GLint       (APIENTRYP PFNGLGETUNIFORMLOCATIONARBPROC)       (VTKViewer_GLhandle program, const GLcharARB *name );
+#else
   typedef void        (APIENTRYP PFNGLDETACHOBJECTARBPROC)             (GLhandleARB containerObj, GLhandleARB obj);
   typedef void        (APIENTRYP PFNGLDELETEOBJECTARBPROC)             (GLhandleARB obj);
   typedef void        (APIENTRYP PFNGLVALIDATEPROGRAMARBPROC)          (GLhandleARB program);
   typedef GLint       (APIENTRYP PFNGLGETUNIFORMLOCATIONARBPROC)       (GLhandleARB program, const GLcharARB *name );
+#endif
   typedef void        (APIENTRYP PFNGLGETSHADERIVARBPROC)              (GLuint shader, GLenum pname, GLint *params);
   typedef void        (APIENTRYP PFNGLGETPROGRAMIVARBPROC)             (GLenum target, GLenum pname, GLint *params);
   typedef void        (APIENTRYP PFNGLGETSHADERINFOLOGARBPROC)         (GLuint shader, GLsizei maxLength, GLsizei *length, GLcharARB *infoLog);

@@ -288,7 +288,7 @@ public:
 
   static QString     getenv( const QString& envVar );
 
-#ifndef WIN32
+#if !defined(WIN32) && !defined(__APPLE__)
   static void*       getDisplay();
   static Qt::HANDLE  getVisual();
 #endif
