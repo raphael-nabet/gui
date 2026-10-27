@@ -135,14 +135,14 @@ private:
 
   VTKViewer_OpenGLHelper OpenGLHelper;
 
-#ifndef __APPLE__
+#ifdef __APPLE__
   VTKViewer_GLhandle PointProgram;
 #else
   GLhandleARB PointProgram;
 #endif
 
 #ifdef VTK_OPENGL2
-#ifndef __APPLE__
+#ifdef __APPLE__
   VTKViewer_GLhandle VertexShader;
   VTKViewer_GLhandle FragmentShader;
 #else
