@@ -161,11 +161,7 @@ int VTKViewer_PolyDataMapper::InitShader()
   this->myLocations.Projection          = this->OpenGLHelper.vglGetUniformLocationARB( this->PointProgram, "uProjectionMatrix" );
   this->myLocations.GeneralPointSize    = this->OpenGLHelper.vglGetUniformLocationARB( this->PointProgram, "uGeneralPointSize" );
   this->myLocations.PointSprite         = this->OpenGLHelper.vglGetUniformLocationARB( this->PointProgram, "uPointSprite" );
-#ifndef __APPLE__
-  this->OpenGLHelper.vglUseProgramObjectARB(current_program);
-#else
   this->OpenGLHelper.vglUseProgramObjectARB( current_program );
-#endif
 
   this->OpenGLHelper.vglGenVertexArraysARB(1, &this->VertexArrayObject);
 #else
@@ -179,7 +175,7 @@ int VTKViewer_PolyDataMapper::InitShader()
 
   char* shader = GUI_OPENGL::readFromFile( fileName );
 
-#ifndef __APPLE__
+#ifdef __APPLE__
   VTKViewer_GLhandle VertexShader = this->OpenGLHelper.vglCreateShaderObjectARB( GL_VERTEX_SHADER_ARB );
 #else
   GLhandleARB VertexShader = this->OpenGLHelper.vglCreateShaderObjectARB( GL_VERTEX_SHADER_ARB );

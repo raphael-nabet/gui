@@ -40,7 +40,6 @@ typedef GLuint VTKViewer_GLhandle;
 #ifndef GL_ARB_shader_objects
 typedef GLuint GLhandleARB;
 #endif
-typedef GLhandleARB VTKViewer_GLhandle;
 #endif
 
 #ifndef APIENTRY
@@ -121,29 +120,25 @@ public:
   bool IsInitialized() const { return mIsInitialized; }
 
 public:
-  bool CreateShaderProgram (const std::string& theFilePath,
 #ifdef __APPLE__
-                                            VTKViewer_GLhandle&       theProgram,
-                                            VTKViewer_GLhandle&       theVertexShader,
-                                            VTKViewer_GLhandle&       theFragmentShader
-#else
-                                                  GLhandleARB&       theProgram,
-                                                  GLhandleARB&       theVertexShader,
-                                                  GLhandleARB&       theFragmentShader
-#endif
-                                                  ) const;
+  bool CreateShaderProgram (const std::string&  theFilePath,
+                            VTKViewer_GLhandle& theProgram,
+                            VTKViewer_GLhandle& theVertexShader,
+                            VTKViewer_GLhandle& theFragmentShader) const;
 
-  void DestroyShaderProgram (
-#ifdef __APPLE__
-                                                    VTKViewer_GLhandle theProgram,
-                                                    VTKViewer_GLhandle theVertexShader,
-                                                    VTKViewer_GLhandle theFragmentShader
+  void DestroyShaderProgram (VTKViewer_GLhandle theProgram,
+                             VTKViewer_GLhandle theVertexShader,
+                             VTKViewer_GLhandle theFragmentShader) const;
 #else
-                                                    GLhandleARB&       theProgram,
-                                                    GLhandleARB&       theVertexShader,
-                                                    GLhandleARB&       theFragmentShader
+  bool CreateShaderProgram (const std::string& theFilePath,
+                            GLhandleARB&       theProgram,
+                            GLhandleARB&       theVertexShader,
+                            GLhandleARB&       theFragmentShader) const;
+
+  void DestroyShaderProgram (GLhandleARB theProgram,
+                             GLhandleARB theVertexShader,
+                             GLhandleARB theFragmentShader) const;
 #endif
-                                                  ) const;
 
 #ifdef VTK_OPENGL2
   void SetUniformMatrix (const GLint         theLocation,

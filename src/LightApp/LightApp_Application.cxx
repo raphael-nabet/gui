@@ -4693,7 +4693,7 @@ bool LightApp_Application::checkModule( const QString& title )
 #if defined(WIN32)
   paths = QString( Qtx::getenv( "PATH" ) ).split( ";", QString::SkipEmptyParts );
 #elif defined(__APPLE__)
-  paths += QString( Qtx::getenv( "DYLD_LIBRARY_PATH" ) ).split( ":", QString::SkipEmptyParts );
+  paths = QString( Qtx::getenv( "DYLD_LIBRARY_PATH" ) ).split( ":", QString::SkipEmptyParts );
 #else
   paths = QString( Qtx::getenv( "LD_LIBRARY_PATH" ) ).split( ":", QString::SkipEmptyParts );
 #endif
