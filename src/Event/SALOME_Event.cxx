@@ -191,14 +191,12 @@ void SALOME_Event::GetSessionThread(){
 */
 bool SALOME_Event::IsSessionThread(){
   bool aResult = false;
-#ifdef WIN32
+#if defined(WIN32)
   aResult = myThread == ::GetCurrentThreadId();
-#else
-#ifdef __APPLE__
+#elif defined(__APPLE__)
   aResult = pthread_equal( myThread, pthread_self() ) != 0;
 #else
   aResult = myThread == pthread_self();
-#endif
 #endif
   return aResult;
 }

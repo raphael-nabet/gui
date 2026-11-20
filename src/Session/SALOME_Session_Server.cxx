@@ -49,6 +49,9 @@
 #ifdef USE_SALOME_STYLE
 #include "Style_Salome.h"
 #endif // USE_SALOME_STYLE
+#ifdef __APPLE__
+#include "Style_MacProxy.h"
+#endif // __APPLE__
 #include "SUIT_Application.h"
 #include "SUIT_Desktop.h"
 #include "SUIT_ExceptionHandler.h"
@@ -518,6 +521,11 @@ int AbstractGUIAppMain(int argc, char **argv)
   // Note: QApplication forces setting locale LC_ALL to system one: setlocale(LC_ALL, "").
   SetArgcArgv(argc,argv);
   Application app(argc, argv);
+
+#ifdef __APPLE__
+  // Fix the geometry / clickable area of the native macOS widgets
+  Style_MacProxy::install();
+#endif // __APPLE__
 
 #ifdef WIN32
     QSettings settings("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",

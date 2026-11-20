@@ -33,6 +33,9 @@
 #ifdef USE_SALOME_STYLE
 #include "Style_Salome.h"
 #endif // USE_SALOME_STYLE
+#ifdef __APPLE__
+#include "Style_MacProxy.h"
+#endif // __APPLE__
 #include "QtxSplash.h"
 
 #include <QDir>
@@ -220,6 +223,11 @@ int main( int argc, char* argv[] )
   // Create Qt application instance: this should be done as early as possible!
   // Note: QApplication forces setting locale LC_ALL to system one: setlocale(LC_ALL, "").
   SUITApp_Application app( argc, argv );
+
+#ifdef __APPLE__
+  // Fix the geometry / clickable area of the native macOS widgets
+  Style_MacProxy::install();
+#endif // __APPLE__
 
   // Initialize Python (if necessary)
   // Note: Python forces setting locale LC_CTYPE to system one: setlocale(LC_CTYPE, "").

@@ -40,6 +40,9 @@ SET(_moc_HEADERS
   Style_PrefDlg.h
   Style_Salome.h
 )
+IF(APPLE)
+  LIST(APPEND _moc_HEADERS Style_MacProxy.h)
+ENDIF()
 
 # header files / internal
 # no processing currently: TODO: check for MSVS project
@@ -85,6 +88,9 @@ SET(_other_SOURCES
   Style_Salome.cxx
   Style_Tools.cxx
 )
+IF(APPLE)
+  LIST(APPEND _other_SOURCES Style_MacProxy.cxx)
+ENDIF()
 
 # sources / to compile
 SET(SalomeStyle_SOURCES ${_other_SOURCES} ${_moc_SOURCES} ${_rcc_SOURCES})

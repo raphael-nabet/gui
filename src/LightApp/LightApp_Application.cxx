@@ -1676,7 +1676,7 @@ void LightApp_Application::showHelp( const QString& path )
 
   if ( useExternalBrowser )
   {
-#ifdef WIN32
+#if defined(WIN32)
     QString browser = resMgr->stringValue( "ExternalBrowser", "winapplication" ) ;
 #elif defined(__APPLE__)
     QString browser = resMgr->stringValue( "ExternalBrowser", "macapplication" );
