@@ -142,8 +142,16 @@ QByteArray GLViewer_Object::getByteCopy()
     int i = 0;
     int anISize = sizeof( int );
 
+#ifdef __APPLE__
+    // keep the temporary byte arrays alive while their data are used
+    const QByteArray aTypeBytes = myType.toLatin1();
+    const QByteArray aToolTipBytes = myToolTipText.toUtf8();
+    const char* aTypeStr = aTypeBytes.constData();
+    const char* aToolTipStr = aToolTipBytes.constData();
+#else
     const char* aTypeStr = myType.toLatin1().constData();
     const char* aToolTipStr = myToolTipText.toUtf8().constData();
+#endif
 
     int aTypeLength = myType.length();
     int aToolTipLength = myToolTipText.length();

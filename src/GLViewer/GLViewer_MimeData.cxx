@@ -71,7 +71,12 @@ bool GLViewer_MimeData::setObjects( QList<GLViewer_Object*> theObjects )
         }
 
         int aCurIndex = anIndex;
+#ifdef __APPLE__
+        const QByteArray aTypesBytes = aTypes.toLatin1(); // keep the buffer alive
+        const char* aStr = aTypesBytes.constData();
+#else
         const char* aStr = aTypes.toLatin1().constData();
+#endif
 
         for( j = 0 ; anIndex < aCurIndex + aStrByteSize; aPointer++, anIndex++, j++ )
             myByteArray[anIndex] = aStr[j];

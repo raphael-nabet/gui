@@ -220,6 +220,9 @@ public:
 #ifdef VTK_OPENGL2
   PFNGLDETACHOBJECTARBPROC             vglDetachObjectARB;
   PFNGLDELETEOBJECTARBPROC             vglDeleteObjectARB;
+#ifdef __APPLE__
+  PFNGLDELETEOBJECTARBPROC             vglDeleteProgram;
+#endif
   PFNGLVALIDATEPROGRAMARBPROC          vglValidateProgramARB;
   PFNGLGETSHADERIVARBPROC              vglGetShaderivARB;
   PFNGLGETPROGRAMIVARBPROC             vglGetProgramivARB;

@@ -3516,11 +3516,17 @@ bool OCCViewer_ViewWindow::isQuadBufferSupport() const
 
 bool OCCViewer_ViewWindow::isOpenGlStereoSupport() const
 {
+#ifdef __APPLE__
+  // No quad-buffered stereo on macOS, and glGetBooleanv() would be called
+  // on whatever context is current (or none: crash).
+  return false;
+#else
   GLboolean support[1];
   glGetBooleanv (GL_STEREO, support);
   if ( support[0] )
     return true;
   return false;
+#endif
 }
 
 // obsolete

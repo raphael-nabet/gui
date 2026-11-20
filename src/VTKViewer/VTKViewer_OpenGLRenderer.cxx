@@ -53,6 +53,9 @@ VTKViewer_OpenGLRenderer::VTKViewer_OpenGLRenderer()
   this->BackgroundVertexShader   = 0;
   this->BackgroundFragmentShader = 0;
   this->VertexArrayObject        = 0;
+#ifdef __APPLE__
+  this->BackgroundShaderFailed   = false;
+#endif
 
   this->OpenGLHelper.Init();
 #endif
@@ -160,6 +163,44 @@ void VTKViewer_OpenGLRenderer::Clear(void)
 #ifdef VTK_OPENGL2
   if (this->OpenGLHelper.IsInitialized())
   {
+#ifdef __APPLE__
+    if (this->BackgroundProgram == 0 && !this->BackgroundShaderFailed)
+    {
+#if defined(WIN32) && defined(UNICODE)
+      const wchar_t* aGuiRootDir = _wgetenv(L"GUI_ROOT_DIR");
+      std::string filePath = aGuiRootDir ?
+        Kernel_Utils::utf8_encode_s( std::wstring( aGuiRootDir ) + L"/share/salome/resources/gui/Background" ) : std::string();
+#else
+      const char* aGuiRootDir = getenv("GUI_ROOT_DIR");
+      std::string filePath = aGuiRootDir ?
+        std::string(aGuiRootDir) + "/share/salome/resources/gui/Background" : std::string();
+#endif
+
+      // On failure the handles are reset to 0 by CreateShaderProgram(): the
+      // background is then drawn with glClear() only (no gradient/texture),
+      // instead of returning before glClear() and using an invalid program.
+      if (filePath.empty() ||
+          !this->OpenGLHelper.CreateShaderProgram (filePath,
+                                                   this->BackgroundProgram,
+                                                   this->BackgroundVertexShader,
+                                                   this->BackgroundFragmentShader))
+      {
+        if (filePath.empty())
+          vtkErrorMacro(<< "GUI_ROOT_DIR is not set: background shaders not found");
+        this->BackgroundShaderFailed = true;
+      }
+      else
+      {
+        // Get uniform locations.
+        this->OpenGLHelper.vglUseProgramObjectARB (this->BackgroundProgram);
+
+        this->myLocations.UseTexture        = this->OpenGLHelper.vglGetUniformLocationARB (this->BackgroundProgram, "uUseTexture");
+        this->myLocations.BackgroundTexture = this->OpenGLHelper.vglGetUniformLocationARB (this->BackgroundProgram, "uBackgroundTexture");
+
+        this->OpenGLHelper.vglUseProgramObjectARB (0);
+      }
+    }
+#else
     if (this->BackgroundProgram == 0)
     {
 #if defined(WIN32) && defined(UNICODE)
@@ -184,6 +225,7 @@ void VTKViewer_OpenGLRenderer::Clear(void)
 
       this->OpenGLHelper.vglUseProgramObjectARB (0);
     }
+#endif
   }
 #endif
 
@@ -213,6 +255,15 @@ void VTKViewer_OpenGLRenderer::Clear(void)
   {
     double aTileViewport[4];
     this->GetRenderWindow()->GetTileViewport( aTileViewport );
+#ifdef __APPLE__
+    // Core profile: no attribute/matrix stacks, no fixed-function states.
+    // The OpenGL2 path below draws in normalized device coordinates with its
+    // own shader, so only the depth test and the blending are switched off.
+    const GLboolean wasDepthTest = glIsEnabled( GL_DEPTH_TEST );
+    const GLboolean wasBlend     = glIsEnabled( GL_BLEND );
+    glDisable( GL_DEPTH_TEST );
+    glDisable( GL_BLEND );
+#else
     glPushAttrib( GL_ENABLE_BIT | GL_TRANSFORM_BIT | GL_TEXTURE_BIT );
     glDisable( GL_ALPHA_TEST );
     glDisable( GL_DEPTH_TEST );
@@ -233,6 +284,7 @@ void VTKViewer_OpenGLRenderer::Clear(void)
     glLoadIdentity();
 
     glOrtho( aTileViewport[0], aTileViewport[2], aTileViewport[1], aTileViewport[3], -1.0, 1.0 );
+#endif
 
     if( this->GradientBackground )
     {
@@ -243,7 +295,11 @@ void VTKViewer_OpenGLRenderer::Clear(void)
       GetCornersColor(corners); 
 
 #ifdef VTK_OPENGL2
+#ifdef __APPLE__
+      if (this->OpenGLHelper.IsInitialized() && this->BackgroundProgram != 0)
+#else
       if (this->OpenGLHelper.IsInitialized())
+#endif
       {
         if (this->VertexArrayObject == 0)
         {
@@ -325,21 +381,27 @@ void VTKViewer_OpenGLRenderer::Clear(void)
     {
       if( VTKViewer_Texture* aTexture = VTKViewer_Texture::SafeDownCast( this->BackgroundTexture ) )
       {
+#ifndef __APPLE__
         glEnable( GL_TEXTURE_2D );
+#endif
 
         aTexture->Render( this );
 
+#ifndef __APPLE__
         // NOTE: By default the mode is GL_MODULATE. Since the user
         // cannot set the mode, the default is set to replace.
         glTexEnvf( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE );
+#endif
         glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
         glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
 
+#ifndef __APPLE__
         // NOTE: vtkTexture Render enables the alpha test
         // so that no buffer is affected if alpha of incoming fragment is
         // below the threshold. Here we have to enable it so that it won't
         // rejects the fragments of the quad as the alpha is set to 0 on it.
         glDisable( GL_ALPHA_TEST );
+#endif
 
         GLfloat texX = 1.F; // texture <s> coordinate
         GLfloat texY = 1.F; // texture <t> coordinate
@@ -356,7 +418,11 @@ void VTKViewer_OpenGLRenderer::Clear(void)
           texY = (GLfloat)aViewHeight / (GLfloat)aHeight; texY *= -1;
         }
 #ifdef VTK_OPENGL2
+#ifdef __APPLE__
+        if (this->OpenGLHelper.IsInitialized() && this->BackgroundProgram != 0)
+#else
         if (this->OpenGLHelper.IsInitialized())
+#endif
         {
           if (this->VertexArrayObject == 0)
           {
@@ -414,7 +480,11 @@ void VTKViewer_OpenGLRenderer::Clear(void)
           this->OpenGLHelper.vglEnableVertexAttribArrayARB (bgColorAttrib);
 
           this->OpenGLHelper.vglUniform1iARB (this->myLocations.UseTexture, 1);
+#ifdef __APPLE__
+          this->OpenGLHelper.vglUniform1iARB (this->myLocations.BackgroundTexture, 0); // texture unit 0, not GL_TEXTURE0
+#else
           this->OpenGLHelper.vglUniform1iARB (this->myLocations.BackgroundTexture, GL_TEXTURE0);
+#endif
 
           glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
@@ -453,6 +523,13 @@ void VTKViewer_OpenGLRenderer::Clear(void)
       }
     }
 
+#ifdef __APPLE__
+    // Restore settings.
+    if ( wasDepthTest )
+      glEnable( GL_DEPTH_TEST );
+    if ( wasBlend )
+      glEnable( GL_BLEND );
+#else
     // Restore settings.
     {
       glEnable( GL_ALPHA_TEST );
@@ -471,5 +548,6 @@ void VTKViewer_OpenGLRenderer::Clear(void)
     glMatrixMode( GL_MODELVIEW );
 
     glPopAttrib();
+#endif
   }
 }

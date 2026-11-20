@@ -373,6 +373,31 @@ CAM_Module* CAM_Application::loadModule( const QString& modName, const bool show
   }
 #else
   void* modLib = dlopen( libName.toUtf8(), RTLD_LAZY | RTLD_GLOBAL );
+#ifdef __APPLE__
+  // A bare library name depends on DYLD_LIBRARY_PATH (erased by SIP) or on
+  // the LC_RPATH of the caller: try <MODULE>_ROOT_DIR/lib/salome and
+  // GUI_ROOT_DIR/lib/salome before giving up.
+  if ( !modLib && !libName.contains( '/' ) )
+  {
+    QString firstError = QString::fromUtf8( dlerror() );
+    QStringList rootVars;
+    rootVars << QString( "%1_ROOT_DIR" ).arg( moduleName( modName ) ) << "GUI_ROOT_DIR";
+    foreach ( QString rootVar, rootVars )
+    {
+      QByteArray rootDir = qgetenv( rootVar.toLatin1().constData() );
+      if ( rootDir.isEmpty() )
+        continue;
+      QString fullName = QDir( QString::fromUtf8( rootDir ) ).filePath( "lib/salome/" + libName );
+      if ( QFileInfo( fullName ).exists() )
+        modLib = dlopen( fullName.toUtf8(), RTLD_LAZY | RTLD_GLOBAL );
+      if ( modLib )
+        break;
+    }
+    if ( !modLib )
+      err = QString( "Can not load library %1. %2" ).arg( libName ).arg( firstError );
+  }
+  else
+#endif
   if ( !modLib )
     err = QString( "Can not load library %1. %2" ).arg( libName ).arg( dlerror() );
   else

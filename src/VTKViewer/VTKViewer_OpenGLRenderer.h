@@ -71,6 +71,9 @@ private:
   GLhandleARB            BackgroundFragmentShader;
 #endif
   GLuint                 VertexArrayObject;
+#ifdef __APPLE__
+  bool                   BackgroundShaderFailed; // do not try to compile again at each rendering
+#endif
 
   struct Locations
   {

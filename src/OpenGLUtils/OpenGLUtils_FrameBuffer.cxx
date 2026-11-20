@@ -96,7 +96,15 @@ static PFNGLDELETERENDERBUFFERSEXTPROC vglDeleteRenderbuffersEXT = NULL;
 #if defined(WIN32)
 #define GL_GetProcAddress( x ) wglGetProcAddress( (const LPCSTR)x )
 #elif defined(__APPLE__)
-#define GL_GetProcAddress( x ) dlsym( RTLD_DEFAULT, x )
+// Look the entry points up in the system OpenGL framework only (a flat
+// RTLD_DEFAULT lookup may find another libGL loaded in the process).
+static void* GUI_AppleGetProcAddress( const char* theName )
+{
+  static void* aLib = dlopen( "/System/Library/Frameworks/OpenGL.framework/OpenGL",
+                              RTLD_LAZY | RTLD_LOCAL );
+  return aLib ? dlsym( aLib, theName ) : NULL;
+}
+#define GL_GetProcAddress( x ) GUI_AppleGetProcAddress( x )
 #else
 #define GL_GetProcAddress( x ) glXGetProcAddressARB( (const GLubyte*)x )
 #endif

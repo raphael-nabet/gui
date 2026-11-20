@@ -252,6 +252,17 @@ run_light_salome()
     export LightAppConfig
     SALOMEPATH=$(echo ${SALOMEPATH} | sed -e "s,^:,,;s,:$,,;s,::\+,:,g")
     export SALOMEPATH
+    if [ "$(uname -s)" = "Darwin" ]; then
+        # BSD sed has no GNU "\+": the lines above leave the "::" in place,
+        # clean the variables again with an extended regular expression
+        PATH=$(echo ${PATH} | sed -E "s,:+,:,g;s,^:,,;s,:$,,")
+        LD_LIBRARY_PATH=$(echo ${LD_LIBRARY_PATH} | sed -E "s,:+,:,g;s,^:,,;s,:$,,")
+        DYLD_LIBRARY_PATH=$(echo ${DYLD_LIBRARY_PATH} | sed -E "s,:+,:,g;s,^:,,;s,:$,,")
+        PYTHONPATH=$(echo ${PYTHONPATH} | sed -E "s,:+,:,g;s,^:,,;s,:$,,")
+        LightAppConfig=$(echo ${LightAppConfig} | sed -E "s,:+,:,g;s,^:,,;s,:$,,")
+        SALOMEPATH=$(echo ${SALOMEPATH} | sed -E "s,:+,:,g;s,^:,,;s,:$,,")
+        export PATH LD_LIBRARY_PATH DYLD_LIBRARY_PATH PYTHONPATH LightAppConfig SALOMEPATH
+    fi
 
     ###
     # start application

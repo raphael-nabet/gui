@@ -36,10 +36,28 @@
  # include <dlfcn.h>
  #endif
 
+#ifdef __APPLE__
+# include <cstdlib>
+# include <cstring>
+# include <string>
+
+#endif
 #if defined(WIN32)
 #define GL_GetProcAddress( x )   wglGetProcAddress( (const LPCSTR)x )
 #elif defined(__APPLE__)
-#define GL_GetProcAddress( x )   dlsym( RTLD_DEFAULT, x )
+namespace
+{
+  // Look the entry points up in the system OpenGL framework only: a flat
+  // lookup (RTLD_DEFAULT) may return the functions of another libGL
+  // (XQuartz, Mesa) loaded in the process, unusable on a CGL context.
+  void* GUI_AppleGetProcAddress( const char* theName )
+  {
+    static void* aLib = dlopen( "/System/Library/Frameworks/OpenGL.framework/OpenGL",
+                                RTLD_LAZY | RTLD_LOCAL );
+    return aLib ? dlsym( aLib, theName ) : NULL;
+  }
+}
+#define GL_GetProcAddress( x )   GUI_AppleGetProcAddress( x )
 #else
  #define GL_GetProcAddress( x )   glXGetProcAddressARB( (const GLubyte*)x )
 #endif
@@ -68,6 +86,9 @@ VTKViewer_OpenGLHelper::VTKViewer_OpenGLHelper()
 #ifdef VTK_OPENGL2
   vglDetachObjectARB             (NULL),
   vglDeleteObjectARB             (NULL),
+#ifdef __APPLE__
+  vglDeleteProgram               (NULL),
+#endif
   vglValidateProgramARB          (NULL),
   vglGetShaderivARB              (NULL),
   vglGetProgramivARB             (NULL),
@@ -161,19 +182,37 @@ void VTKViewer_OpenGLHelper::Init()
   if( !vglUseProgramObjectARB )
     return;
 
+#ifdef __APPLE__
+  // macOS core profile: GL_ARB_vertex_buffer_object is not exposed, the
+  // OpenGL 1.5 core entry points are used instead
+  vglGenBuffersARB = (PFNGLGENBUFFERSARBPROC)GL_GetProcAddress( "glGenBuffers" );
+#else
   vglGenBuffersARB = (PFNGLGENBUFFERSARBPROC)GL_GetProcAddress( "glGenBuffersARB" );
+#endif
   if( !vglGenBuffersARB )
     return;
 
+#ifdef __APPLE__
+  vglBindBufferARB = (PFNGLBINDBUFFERARBPROC)GL_GetProcAddress( "glBindBuffer" );
+#else
   vglBindBufferARB = (PFNGLBINDBUFFERARBPROC)GL_GetProcAddress( "glBindBufferARB" );
+#endif
   if( !vglBindBufferARB )
     return;
 
+#ifdef __APPLE__
+  vglBufferDataARB = (PFNGLBUFFERDATAARBPROC)GL_GetProcAddress( "glBufferData" );
+#else
   vglBufferDataARB = (PFNGLBUFFERDATAARBPROC)GL_GetProcAddress( "glBufferDataARB" );
+#endif
   if( !vglBufferDataARB )
     return;
 
+#ifdef __APPLE__
+  vglDeleteBuffersARB = (PFNGLDELETEBUFFERSARBPROC)GL_GetProcAddress( "glDeleteBuffers" );
+#else
   vglDeleteBuffersARB = (PFNGLDELETEBUFFERSARBPROC)GL_GetProcAddress( "glDeleteBuffersARB" );
+#endif
   if( !vglDeleteBuffersARB )
     return;
 
@@ -210,6 +249,13 @@ void VTKViewer_OpenGLHelper::Init()
   if( !vglDeleteObjectARB )
     return;
 
+#ifdef __APPLE__
+  // glDeleteShader() does not delete program objects (glDeleteObjectARB does)
+  vglDeleteProgram = (PFNGLDELETEOBJECTARBPROC)GL_GetProcAddress( "glDeleteProgram" );
+  if( !vglDeleteProgram )
+    return;
+
+#endif
 #ifdef __APPLE__
   vglValidateProgramARB = (PFNGLVALIDATEPROGRAMARBPROC)GL_GetProcAddress( "glValidateProgram" );
 #else
@@ -294,6 +340,37 @@ namespace GUI_OPENGL
 		}
 		fclose( file );
 	  }
+#ifdef __APPLE__
+	  else
+	  {
+		std::cerr << "Can't read shader file " << fileName << std::endl;
+	  }
+
+	  // macOS only provides a 3.2+ core profile, where GLSL versions lower
+	  // than 1.40 are rejected ("#version 130" in Background.fs.glsl,
+	  // Point.vs.glsl and Point.fs.glsl). The shaders already use in/out and
+	  // texture() when __VERSION__ >= 130, so they are compiled as 3.30 core.
+	  if( content )
+	  {
+		const char* aStart = content;
+		while( *aStart == ' ' || *aStart == '\t' || *aStart == '\r' || *aStart == '\n' )
+		  ++aStart;
+		if( strncmp( aStart, "#version", 8 ) == 0 )
+		{
+		  const char* anEnd = strchr( aStart, '\n' );
+		  std::string aVersionLine( aStart, anEnd ? anEnd - aStart : strlen( aStart ) );
+		  int aVersion = atoi( aVersionLine.c_str() + 8 );
+		  if( aVersion < 330 )
+		  {
+			std::string aNewContent = std::string( "#version 330 core" ) + ( anEnd ? anEnd : "\n" );
+			char* aNewBuffer = ( char* )malloc( aNewContent.size() + 1 );
+			memcpy( aNewBuffer, aNewContent.c_str(), aNewContent.size() + 1 );
+			free( content );
+			content = aNewBuffer;
+		  }
+		}
+	  }
+#endif
 
 	  return content;
 	}
@@ -314,6 +391,131 @@ bool VTKViewer_OpenGLHelper::CreateShaderProgram (const std::string& theFilePath
                                                   GLhandleARB&       theFragmentShader) const
 #endif
 {
+#ifdef __APPLE__
+#ifdef VTK_OPENGL2
+  theProgram = theVertexShader = theFragmentShader = 0;
+
+  // Create program.
+  theProgram = vglCreateProgramObjectARB();
+  if (theProgram == 0)
+  {
+    std::cerr << "Can't create opengl program." << std::endl;
+    return false;
+  }
+
+  std::string fileName;
+  char*       shaderContent;
+  GLint       linked = GL_FALSE, compileStatus = GL_FALSE, validateStatus = GL_FALSE;
+  GLsizei     size = 0;
+  GLcharARB   info[1024];
+  bool        isOk = true;
+
+  // Create vertex shader.
+  fileName = theFilePath + ".vs.glsl";
+
+  shaderContent = GUI_OPENGL::readFromFile (fileName);
+  if (!shaderContent)
+  {
+    std::cerr << "Can't compile vertex shader: no source." << std::endl;
+    isOk = false;
+  }
+  else
+  {
+    theVertexShader = vglCreateShaderObjectARB (GL_VERTEX_SHADER_ARB);
+    vglShaderSourceARB (theVertexShader, 1, (const GLcharARB**)&shaderContent, NULL);
+    vglCompileShaderARB (theVertexShader);
+
+    free( shaderContent );
+
+    vglGetShaderivARB (theVertexShader, GL_COMPILE_STATUS, &compileStatus);
+    if (compileStatus != GL_TRUE)
+    {
+      info[0] = '\0';
+      vglGetShaderInfoLogARB (theVertexShader, sizeof(info), &size, info);
+      std::cerr << "Can't compile vertex shader " << fileName << std::endl;
+      std::cerr << info << std::endl;
+      isOk = false;
+    }
+  }
+
+  // Create fragment shader.
+  if (isOk)
+  {
+    fileName = theFilePath + ".fs.glsl";
+
+    shaderContent = GUI_OPENGL::readFromFile (fileName);
+    if (!shaderContent)
+    {
+      std::cerr << "Can't compile fragment shader: no source." << std::endl;
+      isOk = false;
+    }
+    else
+    {
+      theFragmentShader = vglCreateShaderObjectARB (GL_FRAGMENT_SHADER_ARB);
+      vglShaderSourceARB (theFragmentShader, 1, (const GLcharARB**)&shaderContent, NULL);
+      vglCompileShaderARB (theFragmentShader);
+
+      free (shaderContent);
+
+      vglGetShaderivARB (theFragmentShader, GL_COMPILE_STATUS, &compileStatus);
+      if (compileStatus != GL_TRUE)
+      {
+        info[0] = '\0';
+        vglGetShaderInfoLogARB (theFragmentShader, sizeof(info), &size, info);
+        std::cerr << "Can't compile fragment shader " << fileName << std::endl;
+        std::cerr << info << std::endl;
+        isOk = false;
+      }
+    }
+  }
+
+  // Attach shaders.
+  if (isOk)
+  {
+    vglAttachObjectARB (theProgram, theVertexShader);
+    vglAttachObjectARB (theProgram, theFragmentShader);
+    vglLinkProgramARB  (theProgram);
+
+    vglGetProgramivARB (theProgram, GL_LINK_STATUS, &linked);
+    if (!linked)
+    {
+      std::cerr << "Can't link program." << std::endl;
+      isOk = false;
+    }
+  }
+
+  if (isOk)
+  {
+    vglValidateProgramARB (theProgram);
+    vglGetProgramivARB (theProgram, GL_VALIDATE_STATUS, &validateStatus);
+
+    if (validateStatus != GL_TRUE)
+    {
+#ifdef __APPLE__
+      // In a core profile the validation fails as long as no vertex array
+      // object is bound, which is the case here: not an error.
+      std::cerr << "Warning: shader program is not validated (no VAO bound)." << std::endl;
+#else
+      std::cerr << "Shader program is not validate." << std::endl;
+      isOk = false;
+#endif
+    }
+  }
+
+  if (!isOk)
+  {
+    // Do not leave a half-built program behind: the callers test the
+    // handle against 0 and would use it at every following rendering.
+    DestroyShaderProgram (theProgram, theVertexShader, theFragmentShader);
+    theProgram = theVertexShader = theFragmentShader = 0;
+    return false;
+  }
+
+  return true;
+#else
+  return false;
+#endif
+#else
 #ifdef VTK_OPENGL2
   // Create program.
   theProgram = vglCreateProgramObjectARB();
@@ -399,6 +601,7 @@ bool VTKViewer_OpenGLHelper::CreateShaderProgram (const std::string& theFilePath
 #else
   return false;
 #endif
+#endif
 }
 
 // ============================================================================
@@ -415,12 +618,39 @@ void VTKViewer_OpenGLHelper::DestroyShaderProgram (GLhandleARB theProgram,
                                                    GLhandleARB theFragmentShader) const
 #endif
 {
+#ifdef __APPLE__
+#ifdef VTK_OPENGL2
+  // Nothing was created (or the entry points are missing): no GL call, the
+  // destructors of the mappers/renderers may run without any GL context.
+  if (!mIsInitialized)
+    return;
+
+  if (theProgram != 0)
+  {
+    if (theVertexShader != 0)
+      vglDetachObjectARB (theProgram, theVertexShader);
+    if (theFragmentShader != 0)
+      vglDetachObjectARB (theProgram, theFragmentShader);
+  }
+
+  if (theVertexShader != 0)
+    vglDeleteObjectARB (theVertexShader);
+  if (theFragmentShader != 0)
+    vglDeleteObjectARB (theFragmentShader);
+
+#ifdef __APPLE__
+  if (theProgram != 0)
+    vglDeleteProgram (theProgram);
+#endif
+#endif
+#else
 #ifdef VTK_OPENGL2
   vglDetachObjectARB (theProgram, theVertexShader);
   vglDetachObjectARB (theProgram, theFragmentShader);
 
   vglDeleteObjectARB (theVertexShader);
   vglDeleteObjectARB (theFragmentShader);
+#endif
 #endif
 }
 

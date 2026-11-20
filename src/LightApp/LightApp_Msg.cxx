@@ -23,6 +23,9 @@ Message* Context::GetMessagebySrc(const QString& src)
         i++;
     if (i < Message_list.size())
         return &Message_list[i];
+#ifdef __APPLE__
+    return nullptr;
+#endif
 }
 
 

@@ -96,7 +96,12 @@ QByteArray GLViewer_Text::getByteCopy() const
     int aR = myColor.red();
     int aG = myColor.green();
     int aB = myColor.blue();
+#ifdef __APPLE__
+    const QByteArray aTextBytes = myText.toLatin1(); // keep the buffer alive
+    const char* aStr = aTextBytes.constData();
+#else
     const char* aStr = myText.toLatin1().constData();
+#endif
 
     int anISize = sizeof( int );    
     QByteArray aResult;
@@ -131,7 +136,12 @@ QByteArray GLViewer_Text::getByteCopy() const
     for( ; i < 7*anISize + aTextSize; i++, aPointer++ )
         aResult[i] = *aPointer;
 
+#ifdef __APPLE__
+    const QByteArray aFontBytes = myQFont.toString().toLatin1(); // keep the buffer alive
+    const char* aFontStr = aFontBytes.constData();
+#else
     const char* aFontStr = myQFont.toString().toLatin1().constData();
+#endif
     int aFontSize = myQFont.toString().length();
 
     for( i = 0; i < aFontSize; i++ )

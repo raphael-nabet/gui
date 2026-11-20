@@ -40,6 +40,10 @@
 #include "Basics_Utils.hxx"
 
 #include <QMutex>
+#ifdef __APPLE__
+#include <string>
+#include <vector>
+#endif
 #include <QWaitCondition>
 
 // Open CASCADE Includes
@@ -259,7 +263,20 @@ bool SALOME_Session_i::restoreVisualState(CORBA::Long theSavePoint)
   public:
     TEvent(int savePoint) { _savePoint = savePoint; }
     virtual void Execute() {
+#ifdef __APPLE__
+      // createEmptyStudy() creates widgets: it must run in the GUI thread
+      // (AppKit aborts when widgets are created from an omniORB thread).
+      SUIT_Application* app = SUIT_Session::session()->activeApplication();
+      if ( !app )
+        return;
+      SUIT_Study* study = app->activeStudy();
+      if ( !study ) {
+        app->createEmptyStudy();
+        study = app->activeStudy();
+      }
+#else
       SUIT_Study* study = SUIT_Session::session()->activeApplication()->activeStudy();
+#endif
       if ( study ) {
         study->restoreState(_savePoint);
       }
@@ -267,8 +284,10 @@ bool SALOME_Session_i::restoreVisualState(CORBA::Long theSavePoint)
   };
   
   if(SUIT_Session::session() && SUIT_Session::session()->activeApplication() ) {
+#ifndef __APPLE__
     SUIT_Study* study = SUIT_Session::session()->activeApplication()->activeStudy();
     if(!study) SUIT_Session::session()->activeApplication()->createEmptyStudy();      
+#endif
     ProcessVoidEvent( new TEvent(theSavePoint) );
     return true;
   }
@@ -314,6 +333,50 @@ void SALOME_Session_i::emitMessageOneWay(const char* theMessage)
 
 SALOME_CMOD::StringSeq* SALOME_Session_i::getSelection()
 {
+#ifdef __APPLE__
+  // The selection manager is a GUI object: read it in the GUI thread
+  // (SALOME_Event), not in the omniORB thread under _GUIMutex only.
+  class TEvent: public SALOME_Event {
+  public:
+    std::vector<std::string> myEntries;
+    virtual void Execute() {
+      if ( !SUIT_Session::session() )
+        return;
+      LightApp_Application* app = dynamic_cast<LightApp_Application*>( SUIT_Session::session()->activeApplication() );
+      if ( !app )
+        return;
+      LightApp_SelectionMgr* selMgr = dynamic_cast<LightApp_SelectionMgr*>( app->selectionMgr() );
+      if ( !selMgr )
+        return;
+      SALOME_ListIO selected;
+      selMgr->selectedObjects( selected );
+      for ( SALOME_ListIteratorOfListIO it( selected ); it.More(); it.Next() ) {
+        Handle( SALOME_InteractiveObject ) io = it.Value();
+        if ( io->hasEntry() )
+          myEntries.push_back( io->getEntry() );
+      }
+    }
+  };
+
+  // wait for the GUI to be ready, as before
+  _GUIMutex->lock();
+  _GUIMutex->unlock();
+
+  TEvent* anEvent = new TEvent;
+  if ( SALOME_Event::IsSessionThread() )
+    anEvent->Execute();
+  else
+    anEvent->process();
+  std::vector<std::string> entries;
+  entries.swap( anEvent->myEntries );
+  delete anEvent;
+
+  SALOME_CMOD::StringSeq_var selection = new SALOME_CMOD::StringSeq;
+  selection->length( (CORBA::ULong)entries.size() );
+  for ( size_t i = 0; i < entries.size(); i++ )
+    selection[(CORBA::ULong)i] = CORBA::string_dup( entries[i].c_str() );
+  return selection._retn();
+#else
   SALOME_CMOD::StringSeq_var selection = new SALOME_CMOD::StringSeq;
   _GUIMutex->lock();
   if ( SUIT_Session::session() ) {
@@ -334,6 +397,7 @@ SALOME_CMOD::StringSeq* SALOME_Session_i::getSelection()
   }
   _GUIMutex->unlock();
   return selection._retn();
+#endif
 }
 
 void SALOME_Session_i::deleteContainersinNS()

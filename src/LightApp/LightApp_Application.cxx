@@ -4693,7 +4693,23 @@ bool LightApp_Application::checkModule( const QString& title )
 #if defined(WIN32)
   paths = QString( Qtx::getenv( "PATH" ) ).split( ";", QString::SkipEmptyParts );
 #elif defined(__APPLE__)
+  // DYLD_LIBRARY_PATH is erased by SIP when going through /bin/sh, and may be
+  // empty in a bundle relocated with rpaths: also look in LD_LIBRARY_PATH,
+  // DYLD_FALLBACK_LIBRARY_PATH and in <MODULE>_ROOT_DIR/lib/salome
+  // (GUI_ROOT_DIR/lib/salome for the SalomePyQt GUI library).
   paths = QString( Qtx::getenv( "DYLD_LIBRARY_PATH" ) ).split( ":", QString::SkipEmptyParts );
+  paths += QString( Qtx::getenv( "DYLD_FALLBACK_LIBRARY_PATH" ) ).split( ":", QString::SkipEmptyParts );
+  paths += QString( Qtx::getenv( "LD_LIBRARY_PATH" ) ).split( ":", QString::SkipEmptyParts );
+  {
+    QStringList rootVars;
+    rootVars << QString( "%1_ROOT_DIR" ).arg( name ) << "GUI_ROOT_DIR";
+    foreach ( QString rootVar, rootVars )
+    {
+      QString rootDir = Qtx::getenv( rootVar );
+      if ( !rootDir.isEmpty() )
+        paths << Qtx::addSlash( rootDir ) + "lib/salome";
+    }
+  }
 #else
   paths = QString( Qtx::getenv( "LD_LIBRARY_PATH" ) ).split( ":", QString::SkipEmptyParts );
 #endif

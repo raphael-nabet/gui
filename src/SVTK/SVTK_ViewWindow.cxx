@@ -1031,11 +1031,17 @@ void SVTK_ViewWindow::SetQuadBufferSupport(const bool theEnable)
 */
 bool SVTK_ViewWindow::isOpenGlStereoSupport() const
 {
+#ifdef __APPLE__
+  // No quad-buffered stereo on macOS, and glGetBooleanv() would be called
+  // on whatever context is current (or none: crash).
+  return false;
+#else
   GLboolean support[1];
   glGetBooleanv (GL_STEREO, support);
   if ( support[0] )
     return true;
   return false;
+#endif
 }
 
 /*!
@@ -1375,6 +1381,11 @@ QImage SVTK_ViewWindow::dumpViewContent()
   int aHeight = aSize[1];
 
 #ifndef DISABLE_GLVIEWER
+#ifdef __APPLE__
+  // OpenGLUtils_FrameBuffer::init() issues GL calls: the context of this
+  // view must be current (on macOS a GL call without context crashes).
+  aWindow->MakeCurrent();
+#endif
   OpenGLUtils_FrameBuffer aFrameBuffer;
   if( aFrameBuffer.init( aWidth, aHeight ) )
   {

@@ -151,6 +151,10 @@ private:
 #endif
   GLuint      VertexArrayObject;
 #endif
+#ifdef __APPLE__
+  GLboolean   mySavedDepthTest;   // no glPushAttrib() in a core profile
+  GLint       mySavedDepthFunc;
+#endif
 
   struct Locations {
     static const GLint INVALID_LOCATION = -1;

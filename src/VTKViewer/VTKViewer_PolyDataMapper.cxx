@@ -58,6 +58,13 @@
 # include <wingdi.h>
 #endif
 
+#ifdef __APPLE__
+// <OpenGL/gl.h> is the 2.1 header: name the 3.2 core enum by hand
+# ifndef GL_PROGRAM_POINT_SIZE
+#  define GL_PROGRAM_POINT_SIZE 0x8642
+# endif
+
+#endif
 #ifndef VTK_IMPLEMENT_MESA_CXX
 vtkStandardNewMacro(VTKViewer_PolyDataMapper)
 #endif
@@ -118,6 +125,13 @@ VTKViewer_PolyDataMapper::VTKViewer_PolyDataMapper()
 #ifdef VTK_OPENGL2
   this->VertexShader              = 0;
   this->FragmentShader            = 0;
+#ifdef __APPLE__
+  this->VertexArrayObject         = 0;
+#endif
+#endif
+#ifdef __APPLE__
+  this->mySavedDepthTest          = GL_FALSE;
+  this->mySavedDepthFunc          = GL_LESS;
 #endif
 
   this->OpenGLHelper.Init();
@@ -147,10 +161,25 @@ int VTKViewer_PolyDataMapper::InitShader()
 	std::wstring wFilePath = std::wstring(_wgetenv(L"GUI_ROOT_DIR")) + L"/share/salome/resources/gui/Point";
 	std::string filePath = Kernel_Utils::utf8_encode_s(wFilePath.c_str());
 #else
+#ifdef __APPLE__
+  const char* aGuiRootDir = getenv( "GUI_ROOT_DIR" );
+  if( !aGuiRootDir )
+  {
+    MESSAGE("GUI_ROOT_DIR is not set: point sprite shaders not found");
+    return ES_Error;
+  }
+  std::string filePath = std::string( aGuiRootDir ) + "/share/salome/resources/gui/Point";
+#else
   std::string filePath = std::string( getenv( "GUI_ROOT_DIR") ) + "/share/salome/resources/gui/Point";
 #endif
+#endif
+#ifdef __APPLE__
+  if( !this->OpenGLHelper.CreateShaderProgram(filePath, this->PointProgram, this->VertexShader, this->FragmentShader) )
+    return ES_Error;
+#else
   if( !this->OpenGLHelper.CreateShaderProgram(filePath, this->PointProgram, this->VertexShader, this->FragmentShader) )
     return false;
+#endif
 
   // Get uniform locations.
   GLint current_program;
@@ -169,11 +198,23 @@ int VTKViewer_PolyDataMapper::InitShader()
 	std::wstring wFilePath = std::wstring(_wgetenv( L"GUI_ROOT_DIR" ) ) + L"/share/salome/resources/gui/Vertex_Program_ARB.txt";
 	std::string fileName = Kernel_Utils::utf8_encode( wFilePath.c_str() );
 #else
+#ifdef __APPLE__
+  const char* aGuiRootDir = getenv( "GUI_ROOT_DIR" );
+  if( !aGuiRootDir )
+    return ES_Error;
+  std::string fileName = std::string( aGuiRootDir ) +
+                         "/share/salome/resources/gui/Vertex_Program_ARB.txt";
+#else
   std::string fileName = std::string( getenv( "GUI_ROOT_DIR") ) +
                          "/share/salome/resources/gui/Vertex_Program_ARB.txt";
 #endif
+#endif
 
   char* shader = GUI_OPENGL::readFromFile( fileName );
+#ifdef __APPLE__
+  if( !shader )
+    return ES_Error;
+#endif
 
 #ifdef __APPLE__
   VTKViewer_GLhandle VertexShader = this->OpenGLHelper.vglCreateShaderObjectARB( GL_VERTEX_SHADER_ARB );
@@ -376,6 +417,20 @@ int VTKViewer_PolyDataMapper::GetMarkerTexture()
 //-----------------------------------------------------------------------------
 int VTKViewer_PolyDataMapper::InitExtensions()
 {
+#ifdef __APPLE__
+  // Test the helper first: if VTKViewer_OpenGLHelper::Init() stopped on a
+  // missing entry point, vglGetStringiARB is NULL (call at address 0).
+  if( !this->OpenGLHelper.IsInitialized() )
+  {
+    MESSAGE("Initializing ARB extensions failed");
+    return ES_Error;
+  }
+#endif
+#if defined(VTK_OPENGL2) && defined(__APPLE__)
+  // macOS core profile (3.2+): point sprites, buffer objects and GLSL are
+  // part of the core API and are not listed in GL_EXTENSIONS.
+  return this->InitShader();
+#else
 #ifdef VTK_OPENGL2
   int n = 0;
   std::ostringstream strm;
@@ -400,11 +455,22 @@ int VTKViewer_PolyDataMapper::InitExtensions()
   }
 
   return this->InitShader();
+#endif
 }
 
 //-----------------------------------------------------------------------------
 void VTKViewer_PolyDataMapper::InitPointSprites()
 {
+#ifdef __APPLE__
+  // Core profile: point sprites are always on (gl_PointCoord), the alpha
+  // test is done by "discard" in Point.fs.glsl, and there is no attribute
+  // stack: save the depth states by hand.
+  glEnable( GL_PROGRAM_POINT_SIZE );
+  this->mySavedDepthTest = glIsEnabled( GL_DEPTH_TEST );
+  glGetIntegerv( GL_DEPTH_FUNC, &this->mySavedDepthFunc );
+  glDepthFunc( GL_LEQUAL );
+  glEnable( GL_DEPTH_TEST );
+#else
   glEnable( GL_POINT_SPRITE_ARB );
   glEnable( GL_VERTEX_PROGRAM_POINT_SIZE_ARB );
 
@@ -424,15 +490,23 @@ void VTKViewer_PolyDataMapper::InitPointSprites()
   glDisable( GL_LIGHTING );
 
   glDisable( GL_COLOR_MATERIAL );
+#endif
 }
 
 //-----------------------------------------------------------------------------
 void VTKViewer_PolyDataMapper::CleanupPointSprites()
 {
+#ifdef __APPLE__
+  glDepthFunc( this->mySavedDepthFunc );
+  if( !this->mySavedDepthTest )
+    glDisable( GL_DEPTH_TEST );
+  glDisable( GL_PROGRAM_POINT_SIZE );
+#else
   glPopAttrib();
 
   glDisable( GL_VERTEX_PROGRAM_POINT_SIZE_ARB );
   glDisable( GL_POINT_SPRITE_ARB );
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -441,7 +515,9 @@ void VTKViewer_PolyDataMapper::InitTextures()
   if( !this->ImageData.GetPointer() )
     return;
 
+#ifndef __APPLE__
   glEnable( GL_TEXTURE_2D );
+#endif
   if( this->PointSpriteTexture == 0 ) {
     glGenTextures( 1, &this->PointSpriteTexture );
   }
@@ -449,7 +525,9 @@ void VTKViewer_PolyDataMapper::InitTextures()
   this->OpenGLHelper.vglActiveTextureARB( GL_TEXTURE0 );
 #endif
   glBindTexture( GL_TEXTURE_2D, this->PointSpriteTexture );
+#ifndef __APPLE__
   glTexEnvf( GL_POINT_SPRITE_ARB, GL_COORD_REPLACE_ARB, GL_TRUE );
+#endif
   glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
   glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
   
@@ -467,8 +545,21 @@ void VTKViewer_PolyDataMapper::InitTextures()
                 GL_RGBA, GL_UNSIGNED_BYTE, dataPtr );
 
 #ifdef VTK_OPENGL2
+#ifdef __APPLE__
+  // Set sampler: the value is the texture unit index (0), not GL_TEXTURE0,
+  // and it applies to the program in use, so bind PointProgram for it.
+  if( this->ExtensionsInitialized == ES_Ok && this->PointProgram != 0 )
+  {
+    GLint current_program = 0;
+    glGetIntegerv( GL_CURRENT_PROGRAM, &current_program );
+    this->OpenGLHelper.vglUseProgramObjectARB( this->PointProgram );
+    this->OpenGLHelper.vglUniform1iARB( this->myLocations.PointSprite, 0 );
+    this->OpenGLHelper.vglUseProgramObjectARB( current_program );
+  }
+#else
   // Set sampler.
   this->OpenGLHelper.vglUniform1iARB( this->myLocations.PointSprite, GL_TEXTURE0 );
+#endif
 #endif
 }
 
@@ -479,7 +570,13 @@ void VTKViewer_PolyDataMapper::RenderPiece( vtkRenderer* ren, vtkActor* act )
     this->BallEnabled;
   if( isUsePointSprites )
   {
+#ifdef __APPLE__
+    // Initialize once: after a failure (shader not compiled...) the
+    // standard VTK rendering is used, without compiling again at each frame.
+    if( this->ExtensionsInitialized == ES_None )
+#else
     if( this->ExtensionsInitialized != ES_Ok )
+#endif
       this->ExtensionsInitialized = this->InitExtensions();
     this->InitPointSprites();
     this->InitTextures();

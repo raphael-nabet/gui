@@ -331,6 +331,21 @@ SUIT_Session::AppLib SUIT_Session::loadLibrary( const QString& name, QString& li
   lib = ::LoadLibrary( str );
 #else
   lib = dlopen( (const char*)libFile.toUtf8(), RTLD_LAZY | RTLD_GLOBAL  );
+#ifdef __APPLE__
+  // Bare name: do not depend on DYLD_LIBRARY_PATH (erased by SIP) only,
+  // the application libraries (LightApp, SalomeApp) are in GUI_ROOT_DIR.
+  if ( !lib && !libFile.contains( '/' ) )
+  {
+    QByteArray rootDir = qgetenv( "GUI_ROOT_DIR" );
+    if ( !rootDir.isEmpty() )
+    {
+      QString fullName = QString::fromUtf8( rootDir ) + "/lib/salome/" + libFile;
+      lib = dlopen( (const char*)fullName.toUtf8(), RTLD_LAZY | RTLD_GLOBAL );
+      if ( lib )
+        libName = fullName;
+    }
+  }
+#endif
 #endif
   return lib;
 }
